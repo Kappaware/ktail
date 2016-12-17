@@ -13,6 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+package com.kappaware.ktail.config;
 
-rootProject.name = 'ktail'
+@SuppressWarnings("serial")
+public class ConfigurationException extends Exception {
+
+	public ConfigurationException(String m) {
+		super(m);
+	}
+
+}

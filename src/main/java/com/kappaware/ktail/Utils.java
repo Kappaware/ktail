@@ -13,6 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
- 
+package com.kappaware.ktail;
 
-rootProject.name = 'ktail'
+import java.util.Calendar;
+
+import javax.xml.bind.DatatypeConverter;
+
+public class Utils {
+
+	public static String printIsoDateTime(Long ts) {
+		if (ts != null) {
+			Calendar c = Calendar.getInstance();
+			c.setTimeInMillis(ts);
+			return DatatypeConverter.printDateTime(c);
+		} else {
+			return null;
+		}
+	}
+}
