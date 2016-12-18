@@ -50,7 +50,9 @@ public class Configuration {
 		// Very specific to rewind application
 		this.consumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
 		
-		log.debug(String.format("Will display message from '%s' up to '%s' or count > %d", this.fromTimestamp == null ? "-oo" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "oo" : Utils.printIsoDateTime(this.toTimestamp), this.getMaxCount() ));
+		if(!this.isListTopic()) {
+			log.debug(String.format("Will display message from '%s' up to '%s' or count > %d", this.fromTimestamp == null ? "now" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "infinite" : Utils.printIsoDateTime(this.toTimestamp), this.getMaxCount() ));
+		}
 		
 	}
 

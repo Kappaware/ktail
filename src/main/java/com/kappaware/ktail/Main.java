@@ -39,9 +39,9 @@ public class Main {
 			Configuration config = new Configuration(new Parameters(argv));
 			Engine engine = new Engine(config);
 			if(config.isListTopic()) {
-				List<String> topics = engine.listTopic();
-				for(String topic: topics) {
-					System.out.println(topic);
+				List<TopicDesc> topics = engine.listTopic();
+				for(TopicDesc topic: topics) {
+					System.out.println(topic.toString());
 				}
 			} else {
 				engine.tail();

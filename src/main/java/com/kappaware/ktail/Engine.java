@@ -29,6 +29,7 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kappaware.ktail.TopicDesc.PartitionDesc;
 import com.kappaware.ktail.config.Configuration;
 
 public class Engine {
@@ -46,9 +47,39 @@ public class Engine {
 		this.consumer.close();
 	}
 
-	List<String> listTopic() {
-		Map<String, List<PartitionInfo>> t = consumer.listTopics();
-		return new Vector<String>(t.keySet());
+	List<TopicDesc> listTopic() {
+		Map<String, List<PartitionInfo>> partitionsByTopic = consumer.listTopics();
+		List<TopicDesc> topics = new Vector<TopicDesc>();
+		for (String topicName : partitionsByTopic.keySet()) {
+			if (!topicName.startsWith("__")) {		// To skip __consumer_offsets
+				TopicDesc topicDesc = new TopicDesc(topicName);
+				topics.add(topicDesc);
+				List<PartitionInfo> pi = partitionsByTopic.get(topicName);
+				for (int p = 0; p < pi.size(); p++) {
+					PartitionDesc partitionDesc = new PartitionDesc();
+					topicDesc.addPartitionDesc(partitionDesc);
+					TopicPartition topicPartition = new TopicPartition(topicName, p);
+					List<TopicPartition> partAsList = Arrays.asList(new TopicPartition[] { topicPartition });
+					consumer.assign(partAsList);
+					// Loopkup first message
+					consumer.seekToBeginning(partAsList);
+					partitionDesc.setFirstOffset(consumer.position(topicPartition)); // Never fail, as 0 if empty
+					ConsumerRecord<?, ?> firstRecord = fetchOne();
+					if (firstRecord == null) {
+						partitionDesc.setLastOffset(partitionDesc.getFirstOffset()); // Mark as empty
+					} else {
+						consumer.seekToEnd(partAsList);
+						long lastOffset = consumer.position(topicPartition) - 1;
+						partitionDesc.setLastOffset(lastOffset);
+						consumer.seek(topicPartition, lastOffset);
+						ConsumerRecord<?, ?> lastRecord = fetchOne();
+						partitionDesc.setFirstTimestamp(firstRecord.timestamp());
+						partitionDesc.setLastTimestamp(lastRecord.timestamp());
+					}
+				}
+			}
+		}
+		return topics;
 	}
 
 	void tail() {
@@ -74,7 +105,7 @@ public class Engine {
 			for (ConsumerRecord<String, String> record : records) {
 				System.out.println(patternize(this.configuration.getPattern(), record));
 				recordCount++;
-				if(recordCount >= this.configuration.getMaxCount() || (this.configuration.getToTimestamp() != null && record.timestamp() > this.configuration.getToTimestamp())) {
+				if (recordCount >= this.configuration.getMaxCount() || (this.configuration.getToTimestamp() != null && record.timestamp() > this.configuration.getToTimestamp())) {
 					running = false;
 					break;
 				}
