@@ -16,6 +16,7 @@
 package com.kappaware.ktail;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -23,6 +24,7 @@ import java.util.Vector;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -90,11 +92,14 @@ public class Engine {
 		}
 		this.consumer.assign(topicPartitions);
 		if (configuration.getFromTimestamp() != null) {
-			this.consumer.pause(topicPartitions);
-			for (TopicPartition tp : topicPartitions) {
-				rewindPartition(tp);
+			Map<TopicPartition, Long> timestampByPartition = new HashMap<TopicPartition, Long>();
+			for(TopicPartition tp : topicPartitions) {
+				timestampByPartition.put(tp, configuration.getFromTimestamp());
 			}
-			this.consumer.resume(topicPartitions);
+			Map<TopicPartition, OffsetAndTimestamp> offsetByPartition = this.consumer.offsetsForTimes(timestampByPartition);
+			for(Map.Entry<TopicPartition, OffsetAndTimestamp> entry : offsetByPartition.entrySet()) {
+				consumer.seek(entry.getKey(), entry.getValue().offset());
+			}
 		} else {
 			consumer.seekToEnd(topicPartitions);
 		}
@@ -152,74 +157,13 @@ public class Engine {
 			}
 
 		}
-
 		return sb.toString();
-	}
-
-	private void rewindPartition(TopicPartition part) {
-		List<TopicPartition> partAsList = Arrays.asList(new TopicPartition[] { part });
-		this.consumer.resume(partAsList);
-		// Loopkup first message
-		this.consumer.seekToBeginning(partAsList);
-		long firstOffset = this.consumer.position(part); // Never fail, as 0 if empty
-		ConsumerRecord<?, ?> firstRecord = this.fetchOne();
-		if (firstRecord == null) {
-			log.debug(String.format("Partition#%d of topic %s is empty. Pointer set to begining", part.partition(), part.topic()));
-			this.setOffset(part, 0L);
-		} else {
-			log.debug(String.format("Partition#%d of topic %s: First record at offset:%d  timestamp:%s", part.partition(), part.topic(), firstOffset, Utils.printIsoDateTime(firstRecord.timestamp())));
-			this.consumer.seekToEnd(partAsList);
-			long lastOffset = this.consumer.position(part) - 1;
-			this.consumer.seek(part, lastOffset);
-			ConsumerRecord<?, ?> lastRecord = this.fetchOne();
-			log.debug(String.format("Partition#%d of topic %s: Last record at offset:%d  timestamp:%s", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp())));
-			long target = this.configuration.getFromTimestamp();
-			if (firstRecord.timestamp() >= target) {
-				log.debug(String.format("Partition#%d of topic %s: Timestamp %s is before first event (First event timestamp:%s). Pointer set to beginning", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(firstRecord.timestamp())));
-				this.setOffset(part, firstOffset);
-			} else if (lastRecord.timestamp() < target) {
-				log.debug(String.format("Partition#%d of topic %s: Timestamp %s is not yet reached (Last event timestamp:%s). Pointer set to end", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(lastRecord.timestamp())));
-				// This is same as seekToEnd, except if topic is populated in the same time
-				this.setOffset(part, lastOffset + 1);
-			} else {
-				// So, at this point, we got
-				// firstOffset and firstRecord
-				// lastOffset and lastRecord
-				// And target inside this interval
-				// Will lookup appropriate offset, by dichotonimus search
-				int count = 0;
-				while (lastOffset - firstOffset > 1) {
-					if (count++ > 66) {
-						// As offset range can't exceed 2^64, more than 64 loop is a bug symptom
-						throw new RuntimeException(String.format("Too many loop in dichotomous offset lookup. Exiting!"));
-					}
-					long pivotOffset = (lastOffset + firstOffset) / 2;
-					this.consumer.seek(part, pivotOffset);
-					ConsumerRecord<?, ?> pivotRecord = this.fetchOne();
-					if (pivotRecord.timestamp() >= target) {
-						lastOffset = pivotOffset;
-						lastRecord = pivotRecord;
-					} else {
-						firstOffset = pivotOffset;
-						firstRecord = pivotRecord;
-					}
-				}
-				log.info(String.format("Dichotomous search converged in %d loops", count));
-				log.debug(String.format("Partition#%d of topic %s: Pointer set at offset %d - timestamp: %s (previous: %s))", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp()), Utils.printIsoDateTime(firstRecord.timestamp())));
-				this.setOffset(part, lastOffset);
-			}
-		}
-		this.consumer.pause(partAsList);
-	}
-
-	private void setOffset(TopicPartition part, long l) {
-		this.consumer.seek(part, l);
 	}
 
 	// We need some polling time, as even if there is some messages, polling with a short value may return an empty set (May be the time to seek() ?)
 	// See KAFKA-3044. Note: Resolved means doc is adjusted to reflect the fact we have to wait.
 	private ConsumerRecord<?, ?> fetchOne() {
-		ConsumerRecords<?, ?> records = this.consumer.poll(2000);
+		ConsumerRecords<?, ?> records = this.consumer.poll(1000);
 		if (records.count() == 0) {
 			return null;
 		} else {
