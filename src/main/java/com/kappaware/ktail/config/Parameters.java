@@ -26,10 +26,11 @@ public class Parameters extends BaseParameters {
 
 	private OptionSpec<String> BROKERS_OPT;
 	private OptionSpec<String> TOPIC_OPT;
-	private OptionSpec<String> TIMESTAMP_OPT;
-	private OptionSpec<String> BACK_OPT;
 	private OptionSpec<?> LIST_TOPICS_OPT;
 	private OptionSpec<String> PATTERN_OPT;
+	private OptionSpec<String> FROM_OPT;
+	private OptionSpec<String> TO_OPT;
+	private OptionSpec<Long> MAX_COUNT_OPT;
 
 
 	public Parameters(String[] argv) throws ConfigurationException, ParserHelpException {
@@ -37,11 +38,14 @@ public class Parameters extends BaseParameters {
 
 		BROKERS_OPT = parser.accepts("brokers", "Comma separated values of Source Kafka brokers").withRequiredArg().describedAs("br1:9092,br2:9092").ofType(String.class).required();
 		TOPIC_OPT = parser.accepts("topic", "Source topic").withRequiredArg().describedAs("topic1").ofType(String.class);
-		TIMESTAMP_OPT = parser.accepts("timestamp", "Rewind point in time (Iso date format)").withRequiredArg().describedAs("YYYY-MM-DDTHH:MM:SS,msZ").ofType(String.class);
-		BACK_OPT = parser.accepts("back", "Rewind from XX[d|h|m|s]").withRequiredArg().describedAs("10m").ofType(String.class);
 		LIST_TOPICS_OPT = parser.accepts("list", "list available topics");
 		PATTERN_OPT = parser.accepts("pattern", "Display pattern. ex: %t-%o-%k-%v for <timestamp>-<offset>-<key>-<value>").withRequiredArg().describedAs("topic1").ofType(String.class).defaultsTo("%v");
 
+		FROM_OPT = parser.accepts("from", "Start from (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Starting point in time").ofType(String.class);
+		TO_OPT = parser.accepts("to", "Up to (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Ending point in time").ofType(String.class);
+		MAX_COUNT_OPT = parser.accepts("max", "Max record count").withRequiredArg().describedAs("count").ofType(Long.class).defaultsTo(Long.MAX_VALUE);
+		
+		
 		this.parse(argv);
 		
 		if(!this.isListTopics() && !this.result.has(TOPIC_OPT)) {
@@ -58,12 +62,12 @@ public class Parameters extends BaseParameters {
 		return result.valueOf(TOPIC_OPT);
 	}
 
-	public String getTimestamp() {
-		return result.valueOf(TIMESTAMP_OPT);
+	public String getFrom() {
+		return result.valueOf(FROM_OPT);
 	}
 	
-	public String getBack() {
-		return result.valueOf(BACK_OPT);
+	public String getTo() {
+		return result.valueOf(TO_OPT);
 	}
 
 	public boolean isListTopics() {
@@ -72,6 +76,10 @@ public class Parameters extends BaseParameters {
 	
 	public String getPattern() {
 		return result.valueOf(PATTERN_OPT);
+	}
+	
+	public Long getMaxCount() {
+		return result.valueOf(MAX_COUNT_OPT);
 	}
 	
 }

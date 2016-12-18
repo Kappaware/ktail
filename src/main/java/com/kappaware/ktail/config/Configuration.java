@@ -24,62 +24,81 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.kappaware.ktail.Utils;
+
+
 public class Configuration {
 	static Logger log = LoggerFactory.getLogger(Configuration.class);
 
 	
 	private Parameters parameters;
-	private Long timestamp;
+	private Long fromTimestamp;
+	private Long toTimestamp;
 	private Properties consumerProperties;
 
 	public Configuration(Parameters parameters) throws ConfigurationException {
 		this.parameters = parameters;
-		if (this.parameters.getTimestamp() != null) {
-			try {
-				Calendar c = DatatypeConverter.parseDateTime(this.parameters.getTimestamp());
-				this.timestamp = c.getTimeInMillis();
-			} catch (Throwable t) {
-				throw new ConfigurationException(String.format("'%s' is not a valid ISO 8601 datetime expression. It must be like 2015-12-31T13:00:00+01:00 or 2015-12-31T12:00:00Z)", this.parameters.getTimestamp()));
-			}
-		} else if (this.parameters.getBack() != null) {
-			this.timestamp = System.currentTimeMillis();
-			String s = this.parameters.getBack();
-			try {
-				char c = s.charAt(s.length() - 1);
-				Long x = Long.parseLong(s.substring(0, s.length() - 1));
-				switch(c) {
-					case 's':
-						this.timestamp -= x * 1000;
-					break;
-					case 'm':
-						this.timestamp -= x * 60000;
-					break;
-					case'h':
-						this.timestamp -= 3600000;
-					break;
-					case 'd':
-						this.timestamp -= 3600000 * 24;
-					break;
-					default:
-						throw new Exception();
-				}
-			} catch(Throwable t) {
-				log.error(String.format("Unable to parse %s as a duration value. Must be a number followed by s,m,h or d. (e.i 30s or 2j)", s));
-			}
-		} else {
-			this.timestamp = null;
-		}
+		
+		this.fromTimestamp = this.parseTimestamp(this.parameters.getFrom());
+		this.toTimestamp = this.parseTimestamp(this.parameters.getTo());
+		
 		this.consumerProperties = new Properties();
 		this.consumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.parameters.getBrokers());
 		this.consumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+		this.consumerProperties.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 1);
 		this.consumerProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, String.format("ktail"));
 		// Very specific to rewind application
 		this.consumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+		
+		log.debug(String.format("Will display message from '%s' up to '%s' or count > %d", this.fromTimestamp == null ? "-oo" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "oo" : Utils.printIsoDateTime(this.toTimestamp), this.getMaxCount() ));
+		
 	}
 
 	public Parameters getParameters() {
 		return parameters;
 	}
+	
+	Long parseTimestamp(String expr) throws ConfigurationException {
+		if(expr == null) {
+			return null;
+		} else {
+			if(expr.indexOf(':') != -1) {
+				try {
+					Calendar c = DatatypeConverter.parseDateTime(expr);
+					return c.getTimeInMillis();
+				} catch (Throwable t) {
+					throw new ConfigurationException(String.format("'%s' is not a valid ISO 8601 datetime expression. It must be like 2015-12-31T13:00:00 or 2015-12-31T12:00:00Z)", expr));
+				}
+			} else {
+				try {
+					String s = expr.trim().toLowerCase();
+					char c = expr.charAt(s.length() - 1);
+					Long x = Long.parseLong(s.substring(0, s.length() - 1));
+					long timestamp = System.currentTimeMillis();
+					switch(c) {
+						case 's':
+							timestamp -= x * 1000;
+						break;
+						case 'm':
+							timestamp -= x * 60000;
+						break;
+						case'h':
+							timestamp -= 3600000;
+						break;
+						case 'd':
+							timestamp -= 3600000 * 24;
+						break;
+						default:
+							throw new Exception();
+					}
+					return timestamp;
+				} catch(Throwable t) {
+					throw new ConfigurationException(String.format("Unable to parse %s as a duration value. Must be a number followed by s,m,h or d. (e.i 30s or 2j)", expr));
+				}
+			}
+		}
+	}
+	
 	
 	// --------------------------------------
 
@@ -92,8 +111,12 @@ public class Configuration {
 		return parameters.getTopic();
 	}
 	
-	public Long getTimestamp() {
-		return timestamp;
+	public Long getFromTimestamp() {
+		return this.fromTimestamp;
+	}
+
+	public Long getToTimestamp() {
+		return this.toTimestamp;
 	}
 
 	public Properties getConsumerProperties() {
@@ -106,5 +129,9 @@ public class Configuration {
 	
 	public String getPattern() {
 		return this.parameters.getPattern();
+	}
+	
+	public Long getMaxCount() {
+		return this.parameters.getMaxCount();
 	}
 }

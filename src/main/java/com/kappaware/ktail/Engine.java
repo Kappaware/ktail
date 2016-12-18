@@ -57,7 +57,8 @@ public class Engine {
 		for (PartitionInfo p : partitions) {
 			topicPartitions.add(new TopicPartition(p.topic(), p.partition()));
 		}
-		if (configuration.getTimestamp() != null) {
+		this.consumer.assign(topicPartitions);
+		if (configuration.getFromTimestamp() != null) {
 			this.consumer.pause(topicPartitions);
 			for (TopicPartition tp : topicPartitions) {
 				rewindPartition(tp);
@@ -66,20 +67,28 @@ public class Engine {
 		} else {
 			consumer.seekToEnd(topicPartitions);
 		}
-		this.consumer.assign(topicPartitions);
-		ConsumerRecords<String, String> records = consumer.poll(100);
-		for (ConsumerRecord<String, String> record : records) {
-			System.out.println(patternize(this.configuration.getPattern(), record));
+		boolean running = true;
+		long recordCount = 0;
+		while (running) {
+			ConsumerRecords<String, String> records = consumer.poll(1000);
+			for (ConsumerRecord<String, String> record : records) {
+				System.out.println(patternize(this.configuration.getPattern(), record));
+				recordCount++;
+				if(recordCount >= this.configuration.getMaxCount() || (this.configuration.getToTimestamp() != null && record.timestamp() > this.configuration.getToTimestamp())) {
+					running = false;
+					break;
+				}
+			}
 		}
 	}
 
 	private String patternize(String pattern, ConsumerRecord<String, String> record) {
 		StringBuffer sb = new StringBuffer();
 		boolean inToken = false;
-		for(int i = 0; i < pattern.length(); i++) {
+		for (int i = 0; i < pattern.length(); i++) {
 			char c = pattern.charAt(i);
-			if(inToken) {
-				switch(c) {
+			if (inToken) {
+				switch (c) {
 					case '%':
 						sb.append('%');
 					break;
@@ -89,10 +98,10 @@ public class Engine {
 					case 'o':
 						sb.append(Long.toString(record.offset()));
 					break;
-					case 't' :
+					case 't':
 						sb.append(Utils.printIsoDateTime(record.timestamp()));
 					break;
-					case 'k' :
+					case 'k':
 						sb.append(record.key() == null ? "-" : record.key());
 					break;
 					case 'v':
@@ -104,20 +113,18 @@ public class Engine {
 				}
 				inToken = false;
 			} else {
-				if(c ==  '%') {
+				if (c == '%') {
 					inToken = true;
 				} else {
 					sb.append(c);
 				}
 			}
-					
+
 		}
-		
+
 		return sb.toString();
 	}
-	
-	
-	
+
 	private void rewindPartition(TopicPartition part) {
 		List<TopicPartition> partAsList = Arrays.asList(new TopicPartition[] { part });
 		this.consumer.resume(partAsList);
@@ -126,21 +133,21 @@ public class Engine {
 		long firstOffset = this.consumer.position(part); // Never fail, as 0 if empty
 		ConsumerRecord<?, ?> firstRecord = this.fetchOne();
 		if (firstRecord == null) {
-			log.info(String.format("Partition#%d of topic %s is empty. Pointer set to begining", part.partition(), part.topic()));
+			log.debug(String.format("Partition#%d of topic %s is empty. Pointer set to begining", part.partition(), part.topic()));
 			this.setOffset(part, 0L);
 		} else {
-			log.info(String.format("Partition#%d of topic %s: First record at offset:%d  timestamp:%s", part.partition(), part.topic(), firstOffset, Utils.printIsoDateTime(firstRecord.timestamp())));
+			log.debug(String.format("Partition#%d of topic %s: First record at offset:%d  timestamp:%s", part.partition(), part.topic(), firstOffset, Utils.printIsoDateTime(firstRecord.timestamp())));
 			this.consumer.seekToEnd(partAsList);
 			long lastOffset = this.consumer.position(part) - 1;
 			this.consumer.seek(part, lastOffset);
 			ConsumerRecord<?, ?> lastRecord = this.fetchOne();
-			log.info(String.format("Partition#%d of topic %s: Last record at offset:%d  timestamp:%s", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp())));
-			long target = this.configuration.getTimestamp();
+			log.debug(String.format("Partition#%d of topic %s: Last record at offset:%d  timestamp:%s", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp())));
+			long target = this.configuration.getFromTimestamp();
 			if (firstRecord.timestamp() >= target) {
-				log.info(String.format("Partition#%d of topic %s: Timestamp %s is before first event (First event timestamp:%s). Pointer set to beginning", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(firstRecord.timestamp())));
+				log.debug(String.format("Partition#%d of topic %s: Timestamp %s is before first event (First event timestamp:%s). Pointer set to beginning", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(firstRecord.timestamp())));
 				this.setOffset(part, firstOffset);
 			} else if (lastRecord.timestamp() < target) {
-				log.info(String.format("Partition#%d of topic %s: Timestamp %s is not yet reached (Last event timestamp:%s). Pointer set to end", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(lastRecord.timestamp())));
+				log.debug(String.format("Partition#%d of topic %s: Timestamp %s is not yet reached (Last event timestamp:%s). Pointer set to end", part.partition(), part.topic(), Utils.printIsoDateTime(target), Utils.printIsoDateTime(lastRecord.timestamp())));
 				// This is same as seekToEnd, except if topic is populated in the same time
 				this.setOffset(part, lastOffset + 1);
 			} else {
@@ -148,7 +155,7 @@ public class Engine {
 				// firstOffset and firstRecord
 				// lastOffset and lastRecord
 				// And target inside this interval
-				// Will lookup appropriate offset, by dichotomous search
+				// Will lookup appropriate offset, by dichotonimus search
 				int count = 0;
 				while (lastOffset - firstOffset > 1) {
 					if (count++ > 66) {
@@ -167,7 +174,7 @@ public class Engine {
 					}
 				}
 				log.info(String.format("Dichotomous search converged in %d loops", count));
-				log.info(String.format("Partition#%d of topic %s: Pointer set at offset %d - timestamp: %s (previous: %s))", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp()), Utils.printIsoDateTime(firstRecord.timestamp())));
+				log.debug(String.format("Partition#%d of topic %s: Pointer set at offset %d - timestamp: %s (previous: %s))", part.partition(), part.topic(), lastOffset, Utils.printIsoDateTime(lastRecord.timestamp()), Utils.printIsoDateTime(firstRecord.timestamp())));
 				this.setOffset(part, lastOffset);
 			}
 		}
@@ -178,7 +185,8 @@ public class Engine {
 		this.consumer.seek(part, l);
 	}
 
-	// We need some polling time, as even if there is some messages, polling with a short value may return an empty set.
+	// We need some polling time, as even if there is some messages, polling with a short value may return an empty set (May be the time to seek() ?)
+	// See KAFKA-3044. Note: Resolved means doc is adjusted to reflect the fact we have to wait.
 	private ConsumerRecord<?, ?> fetchOne() {
 		ConsumerRecords<?, ?> records = this.consumer.poll(2000);
 		if (records.count() == 0) {
