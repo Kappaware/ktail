@@ -16,6 +16,7 @@
 package com.kappaware.ktail;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +54,7 @@ public class Engine {
 		Map<String, List<PartitionInfo>> partitionsByTopic = consumer.listTopics();
 		List<TopicDesc> topics = new Vector<TopicDesc>();
 		for (String topicName : partitionsByTopic.keySet()) {
-			if (!topicName.startsWith("__")) {		// To skip __consumer_offsets
+			if (!topicName.startsWith("__")) { // To skip __consumer_offsets
 				TopicDesc topicDesc = new TopicDesc(topicName);
 				topics.add(topicDesc);
 				List<PartitionInfo> pi = partitionsByTopic.get(topicName);
@@ -93,12 +94,18 @@ public class Engine {
 		this.consumer.assign(topicPartitions);
 		if (configuration.getFromTimestamp() != null) {
 			Map<TopicPartition, Long> timestampByPartition = new HashMap<TopicPartition, Long>();
-			for(TopicPartition tp : topicPartitions) {
+			for (TopicPartition tp : topicPartitions) {
 				timestampByPartition.put(tp, configuration.getFromTimestamp());
 			}
 			Map<TopicPartition, OffsetAndTimestamp> offsetByPartition = this.consumer.offsetsForTimes(timestampByPartition);
-			for(Map.Entry<TopicPartition, OffsetAndTimestamp> entry : offsetByPartition.entrySet()) {
-				consumer.seek(entry.getKey(), entry.getValue().offset());
+			for (Map.Entry<TopicPartition, OffsetAndTimestamp> entry : offsetByPartition.entrySet()) {
+				if (entry.getValue() == null) {
+					log.debug(String.format("No entry found. We are after the last message. Will seek to end"));
+					Collection<TopicPartition> partitionAsList = Arrays.asList(new TopicPartition[] { entry.getKey() });
+					this.consumer.seekToEnd(partitionAsList);
+				} else {
+					consumer.seek(entry.getKey(), entry.getValue().offset());
+				}
 			}
 		} else {
 			consumer.seekToEnd(topicPartitions);
