@@ -51,7 +51,11 @@ public class Configuration {
 		this.consumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
 		
 		if(!this.isListTopic()) {
-			log.debug(String.format("Will display message from '%s' up to '%s' or count > %d", this.fromTimestamp == null ? "now" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "infinite" : Utils.printIsoDateTime(this.toTimestamp), this.getMaxCount() ));
+			if(this.getMaxCount() == Long.MAX_VALUE) {
+				log.info(String.format("Will dump message from '%s' up to '%s'", this.fromTimestamp == null ? "now" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "infinite" : Utils.printIsoDateTime(this.toTimestamp)));
+			} else {
+				log.info(String.format("Will dump message from '%s' up to '%s' or count > %d", this.fromTimestamp == null ? "now" : Utils.printIsoDateTime(this.fromTimestamp), this.toTimestamp == null ? "infinite" : Utils.printIsoDateTime(this.toTimestamp), this.getMaxCount() ));
+			}
 		}
 		
 	}
@@ -79,16 +83,16 @@ public class Configuration {
 					long timestamp = System.currentTimeMillis();
 					switch(c) {
 						case 's':
-							timestamp -= x * 1000;
+							timestamp -= (x * 1000);
 						break;
 						case 'm':
-							timestamp -= x * 60000;
+							timestamp -= (x * 60000);
 						break;
 						case'h':
-							timestamp -= 3600000;
+							timestamp -= (x * 3600000);
 						break;
 						case 'd':
-							timestamp -= 3600000 * 24;
+							timestamp -= (x * 3600000 * 24);
 						break;
 						default:
 							throw new Exception();
