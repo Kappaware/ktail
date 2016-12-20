@@ -114,12 +114,19 @@ public class Engine {
 		long recordCount = 0;
 		while (running) {
 			ConsumerRecords<String, String> records = consumer.poll(1000);
-			for (ConsumerRecord<String, String> record : records) {
-				System.out.println(patternize(this.configuration.getPattern(), record));
-				recordCount++;
-				if (recordCount >= this.configuration.getMaxCount() || (this.configuration.getToTimestamp() != null && record.timestamp() > this.configuration.getToTimestamp())) {
+			if (records.count() > 0) {
+				for (ConsumerRecord<String, String> record : records) {
+					System.out.println(patternize(this.configuration.getPattern(), record));
+					recordCount++;
+					if (recordCount >= this.configuration.getMaxCount() || (this.configuration.getToTimestamp() != null && record.timestamp() > this.configuration.getToTimestamp())) {
+						running = false;
+						break;
+					}
+				}
+			} else {
+				// No record anymore. Should we stop waiting
+				if(this.configuration.getToTimestamp() != null && System.currentTimeMillis() > this.configuration.getToTimestamp()) {
 					running = false;
-					break;
 				}
 			}
 		}

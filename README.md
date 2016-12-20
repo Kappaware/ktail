@@ -2,7 +2,7 @@
 
 ktail is a small project intended to dump content of a Kafka topic from a given time.
 
-You can launch hbdump by following command:
+You can launch ktail by following command:
 
 	java -jar ktail-0.1.0.jar --help
 
