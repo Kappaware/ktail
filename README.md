@@ -15,7 +15,7 @@ Which should give the following output:
 	--help                           Display this usage message
 	--list                           list available topics
 	--max <Long: count>              Max record count (default: 9223372036854775807)
-	--pattern <topic1>               Display pattern. ex: %t-%o-%k-%v for <timestamp>-<offset>-<key>-<value> (default: %v)
+	--pattern <topic1>               Display pattern. ex: %p-%t-%o-%k-%v for <partition#>-<timestamp>-<offset>-<key>-<value> (default: %v)
 	--to <Ending point in time>      Up to (In Iso date format or in XX[d|h|m|s] notation)
 	--topic <topic1>                 Source topic
 

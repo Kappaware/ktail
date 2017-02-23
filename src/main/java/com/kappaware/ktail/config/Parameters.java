@@ -39,7 +39,7 @@ public class Parameters extends BaseParameters {
 		BROKERS_OPT = parser.accepts("brokers", "Comma separated values of Source Kafka brokers").withRequiredArg().describedAs("br1:9092,br2:9092").ofType(String.class).required();
 		TOPIC_OPT = parser.accepts("topic", "Source topic").withRequiredArg().describedAs("topic1").ofType(String.class);
 		LIST_TOPICS_OPT = parser.accepts("list", "list available topics");
-		PATTERN_OPT = parser.accepts("pattern", "Display pattern. ex: %t-%o-%k-%v for <timestamp>-<offset>-<key>-<value>").withRequiredArg().describedAs("topic1").ofType(String.class).defaultsTo("%v");
+		PATTERN_OPT = parser.accepts("pattern", "Display pattern. ex: %p-%t-%o-%k-%v for <partition#>-<timestamp>-<offset>-<key>-<value>").withRequiredArg().describedAs("topic1").ofType(String.class).defaultsTo("%v");
 
 		FROM_OPT = parser.accepts("from", "Start from (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Starting point in time").ofType(String.class);
 		TO_OPT = parser.accepts("to", "Up to (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Ending point in time").ofType(String.class);
@@ -49,7 +49,7 @@ public class Parameters extends BaseParameters {
 		this.parse(argv);
 		
 		if(!this.isListTopics() && !this.result.has(TOPIC_OPT)) {
-			throw new ConfigurationException("Either --listTopic or --topic <topic> must be defined!");
+			throw new ConfigurationException("Either --list or --topic <topic> must be defined!");
 		}
 	}
 

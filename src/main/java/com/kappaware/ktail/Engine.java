@@ -16,8 +16,6 @@
 package com.kappaware.ktail;
 
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
@@ -25,7 +23,7 @@ import java.util.Vector;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
+//import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -85,6 +83,8 @@ public class Engine {
 		return topics;
 	}
 
+	
+	
 	void tail() {
 		List<PartitionInfo> partitions = consumer.partitionsFor(this.configuration.getTopic());
 		List<TopicPartition> topicPartitions = new Vector<TopicPartition>();
@@ -93,20 +93,7 @@ public class Engine {
 		}
 		this.consumer.assign(topicPartitions);
 		if (configuration.getFromTimestamp() != null) {
-			Map<TopicPartition, Long> timestampByPartition = new HashMap<TopicPartition, Long>();
-			for (TopicPartition tp : topicPartitions) {
-				timestampByPartition.put(tp, configuration.getFromTimestamp());
-			}
-			Map<TopicPartition, OffsetAndTimestamp> offsetByPartition = this.consumer.offsetsForTimes(timestampByPartition);
-			for (Map.Entry<TopicPartition, OffsetAndTimestamp> entry : offsetByPartition.entrySet()) {
-				if (entry.getValue() == null) {
-					log.debug(String.format("No entry found. We are after the last message. Will seek to end"));
-					Collection<TopicPartition> partitionAsList = Arrays.asList(new TopicPartition[] { entry.getKey() });
-					this.consumer.seekToEnd(partitionAsList);
-				} else {
-					consumer.seek(entry.getKey(), entry.getValue().offset());
-				}
-			}
+			Time2Offsets.setOffsetToTs(this.consumer, topicPartitions, configuration.getFromTimestamp());
 		} else {
 			consumer.seekToEnd(topicPartitions);
 		}
@@ -115,6 +102,7 @@ public class Engine {
 		while (running) {
 			ConsumerRecords<String, String> records = consumer.poll(1000);
 			if (records.count() > 0) {
+				//log.debug("--------------------------------------------------------------------------------------------------------------------");
 				for (ConsumerRecord<String, String> record : records) {
 					System.out.println(patternize(this.configuration.getPattern(), record));
 					recordCount++;
@@ -125,13 +113,14 @@ public class Engine {
 				}
 			} else {
 				// No record anymore. Should we stop waiting
-				if(this.configuration.getToTimestamp() != null && System.currentTimeMillis() > this.configuration.getToTimestamp()) {
+				if (this.configuration.getToTimestamp() != null && System.currentTimeMillis() > this.configuration.getToTimestamp()) {
 					running = false;
 				}
 			}
 		}
 	}
-
+	
+	
 	private String patternize(String pattern, ConsumerRecord<String, String> record) {
 		StringBuffer sb = new StringBuffer();
 		boolean inToken = false;
