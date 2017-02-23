@@ -81,6 +81,6 @@ checkJar() {
 
 checkJava
 checkJar
-$java -jar $JOPTS $jar $OPTS $*
+$java -jar $JOPTS $jar $OPTS "$@"
 
 
