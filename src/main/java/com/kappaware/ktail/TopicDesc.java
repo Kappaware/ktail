@@ -35,7 +35,7 @@ public class TopicDesc {
 		if (messageCount == null) {
 			messageCount = 0L;
 			for (PartitionDesc p : this.partitionDescs) {
-				this.messageCount += (p.getLastOffset() - p.getFirstOffset());
+				this.messageCount += (p.getLastOffset() - p.getFirstOffset() +1);
 				if (p.getFirstTimestamp() != null) {
 					if (this.firstTimestamp == null || this.firstTimestamp > p.getFirstTimestamp()) {
 						this.firstTimestamp = p.getFirstTimestamp();

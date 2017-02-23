@@ -64,16 +64,18 @@ public class Engine {
 					consumer.assign(partAsList);
 					// Loopkup first message
 					consumer.seekToBeginning(partAsList);
-					partitionDesc.setFirstOffset(consumer.position(topicPartition)); // Never fail, as 0 if empty
-					ConsumerRecord<?, ?> firstRecord = fetchOne();
-					if (firstRecord == null) {
-						partitionDesc.setLastOffset(partitionDesc.getFirstOffset()); // Mark as empty
+					long firstOffset = consumer.position(topicPartition); // Never fail, as 0 if empty
+					consumer.seekToEnd(partAsList);
+					long lastOffset = consumer.position(topicPartition) - 1;
+					partitionDesc.setFirstOffset(firstOffset); 
+					partitionDesc.setLastOffset(lastOffset);
+					if (lastOffset < firstOffset) {
+						// Partition is empty. Nothing to do anymore
 					} else {
-						consumer.seekToEnd(partAsList);
-						long lastOffset = consumer.position(topicPartition) - 1;
-						partitionDesc.setLastOffset(lastOffset);
 						consumer.seek(topicPartition, lastOffset);
 						ConsumerRecord<?, ?> lastRecord = fetchOne();
+						consumer.seekToBeginning(partAsList);
+						ConsumerRecord<?, ?> firstRecord = fetchOne();
 						partitionDesc.setFirstTimestamp(firstRecord.timestamp());
 						partitionDesc.setLastTimestamp(lastRecord.timestamp());
 					}

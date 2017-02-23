@@ -20,7 +20,6 @@ import java.util.Properties;
 
 import javax.xml.bind.DatatypeConverter;
 
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,13 +41,7 @@ public class Configuration {
 		this.fromTimestamp = this.parseTimestamp(this.parameters.getFrom());
 		this.toTimestamp = this.parseTimestamp(this.parameters.getTo());
 		
-		this.consumerProperties = new Properties();
-		this.consumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.parameters.getBrokers());
-		this.consumerProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-		this.consumerProperties.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, 1);
-		this.consumerProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, String.format("ktail"));
-		// Very specific to rewind application
-		this.consumerProperties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 1);
+		this.consumerProperties = ConsumerPropertiesHelper.buildProperties(this.parameters.getProperties(), this.parameters.getBrokers(), this.parameters.isForceProperties());
 		
 		if(!this.isListTopic()) {
 			if(this.getMaxCount() == Long.MAX_VALUE) {

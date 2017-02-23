@@ -15,6 +15,8 @@
  */
 package com.kappaware.ktail.config;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,8 @@ public class Parameters extends BaseParameters {
 	private OptionSpec<String> FROM_OPT;
 	private OptionSpec<String> TO_OPT;
 	private OptionSpec<Long> MAX_COUNT_OPT;
-
+	private OptionSpec<String> PROPERTY_OPT;
+	private OptionSpec<?> FORCE_PROPERTIES_OPT;
 
 	public Parameters(String[] argv) throws ConfigurationException, ParserHelpException {
 		super();
@@ -40,7 +43,10 @@ public class Parameters extends BaseParameters {
 		TOPIC_OPT = parser.accepts("topic", "Source topic").withRequiredArg().describedAs("topic1").ofType(String.class);
 		LIST_TOPICS_OPT = parser.accepts("list", "list available topics");
 		PATTERN_OPT = parser.accepts("pattern", "Display pattern. ex: %p-%t-%o-%k-%v for <partition#>-<timestamp>-<offset>-<key>-<value>").withRequiredArg().describedAs("topic1").ofType(String.class).defaultsTo("%v");
+		PROPERTY_OPT = parser.accepts("property", "Producer property (May be specified several times)").withRequiredArg().describedAs("prop=val").ofType(String.class);
+		FORCE_PROPERTIES_OPT = parser.accepts("forceProperties", "Force unsafe properties");
 
+		
 		FROM_OPT = parser.accepts("from", "Start from (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Starting point in time").ofType(String.class);
 		TO_OPT = parser.accepts("to", "Up to (In Iso date format or in XX[d|h|m|s] notation)").withRequiredArg().describedAs("Ending point in time").ofType(String.class);
 		MAX_COUNT_OPT = parser.accepts("max", "Max record count").withRequiredArg().describedAs("count").ofType(Long.class).defaultsTo(Long.MAX_VALUE);
@@ -81,5 +87,14 @@ public class Parameters extends BaseParameters {
 	public Long getMaxCount() {
 		return result.valueOf(MAX_COUNT_OPT);
 	}
+	
+	public List<String> getProperties() {
+		return result.valuesOf(PROPERTY_OPT);
+	}
+
+	public boolean isForceProperties() {
+		return result.has(FORCE_PROPERTIES_OPT);
+	}
+
 	
 }

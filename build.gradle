@@ -13,12 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+
+plugins {
+  id 'nebula.ospackage' version '3.4.0'
+}
  
 apply plugin: 'java'
 apply plugin: 'eclipse'
 
 
-defaultTasks 'fatJar'
+defaultTasks 'rpm'
 
 
 repositories {
@@ -48,3 +53,32 @@ task fatJar(type: Jar) {
     from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
+
+task rpm(type: Rpm) {
+	summary 'Dump kafka topic'
+	packageName 'ktail'
+	version versionForRpm
+	arch NOARCH
+	vendor 'BROADSoftware'
+	license 'Apache 2.0'
+	os LINUX
+	release '1'
+	packageDescription 'ktail is a small tool intended to dump content of a Kafka topic from a given time.'
+    
+   	from(fatJar.outputs.files) {
+	    into '/opt/ktail'
+	    user 'root'
+		group 'root'
+		//rename "${fatJarBaseName}(.+).jar", "${fatJarBaseName}.jar"
+	    fileMode 0644
+    }
+    
+   	from('scripts/packages/ktail') { into '/usr/bin'; user 'root'; group 'root'; fileMode 0755  }
+   	from('scripts/packages/log4j.xml') { into '/etc/ktail'; user 'root'; group 'root'; fileMode 0644  }
+   	from('scripts/packages/setenv.sh') { into '/etc/ktail'; user 'root'; group 'root'; fileMode 0644    }
+   	from('scripts/packages/kafka_client_jaas.conf') { into '/etc/ktail'; user 'root'; group 'root'; fileMode 0644    }
+}
+
+
+
+
